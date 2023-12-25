@@ -1,0 +1,5 @@
+python-engineio
+flask
+ping3
+pymodbus
+flask_socketio
