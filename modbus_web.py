@@ -3,13 +3,8 @@ import argparse
 import subprocess
 import time
 import traceback
-from abc import ABC, abstractmethod
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from textwrap import dedent
 from threading import Event, Thread
 
-from engineio.async_drivers import \
-    threading  # * 替代解決辦法 socketio使用threading 打包才能執行
 from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 from ping3 import ping
@@ -197,6 +192,7 @@ class ModbusThread(Thread):
                     self.number_of_connect += 1
                     count = numbers[-1] - numbers[0]
                     count = 1 if count == 0 else count
+                    
                     result = read_funt(numbers[0]-1, count=count, slave=self.slave) # 修正為從0開始
                     if result.isError() == True:
                         grouped_registers.append([])
