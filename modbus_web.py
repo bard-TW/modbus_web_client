@@ -165,15 +165,26 @@ class ModbusThread(Thread):
                 emit('connect_modbus_success', {'data': 'modbus 連線成功'}, namespace='/', broadcast=True, room=self.room)
 
             while not self.exit_signal.is_set():
-                for x in range(self.time_sleep, 0, -1):
+
+                # 秒數對其，下一輪等待秒數-現在時間，取餘數(毫秒)，取出來先sleep，回應過慢還是會有問題
+                now_time = time.time()
+                next_time = int(now_time) + self.time_sleep
+                sleep_second = next_time - (self.time_sleep-1) - now_time
+                time.sleep(sleep_second if sleep_second > 0 else 0)
+
+                with app.app_context():
+                    emit('wait_time_progress', {'progress': f"{0}%"}, namespace='/', broadcast=True, room=self.room)
+
+                for x in range(self.time_sleep-1, 0, -1):
                     time.sleep(1)
                     if self.time_sleep >=5:
                         with app.app_context():
                             emit('wait_time_progress', {'progress': f"{int((self.time_sleep-x)/(self.time_sleep-1)*100)}%"}, namespace='/', broadcast=True, room=self.room)
 
-                    current_time = time.localtime()
                     if x > self.time_sleep or self.exit_signal.is_set():
                         break
+
+                current_time = time.localtime()
 
                 if self.point_type == '1':
                     read_funt = client.read_coils
