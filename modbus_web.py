@@ -23,10 +23,6 @@ modbus_connect_room = {} # sid: obj
 def index():
     return render_template('index.html')
 
-# @app.route('/')
-# def index():
-#     return render_template('')
-
 @socketio.on('connect')
 def handle_connect():
     return jsonify(
@@ -319,4 +315,4 @@ if __name__ == '__main__':
 
     url = f"http://{ip}:{port}"
     subprocess.Popen(["start", url], shell=True)
-    socketio.run(app, debug=False, host=ip, port=port)
+    socketio.run(app, debug=True, host=ip, port=port)
