@@ -5,6 +5,8 @@ import time
 import traceback
 from threading import Event, Thread
 
+from engineio.async_drivers import \
+    threading  # * 替代解決辦法 socketio使用threading 打包才能執行
 from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 from ping3 import ping
@@ -316,4 +318,4 @@ if __name__ == '__main__':
 
     url = f"http://{ip}:{port}"
     subprocess.Popen(["start", url], shell=True)
-    socketio.run(app, debug=True, host=ip, port=port)
+    socketio.run(app, debug=False, host=ip, port=port)
