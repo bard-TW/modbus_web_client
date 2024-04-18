@@ -203,7 +203,7 @@
         var tabledata = [
             { "id": data_id, "is_valid": true, "is_log": false, "name": "測試", "point": 3001, "data_type": "float32", "scale": 1, "data_sort": "低到高", "decimal": 2 }
         ];
-
+        
         var data_type = [
             "int16",
             "int32",
@@ -290,7 +290,7 @@
 
         function add_point() {
             data_id += 1
-            table_point.addData([{ "id": data_id, "is_valid": true, "is_log": false, "name": "測試", "point": 3002, "data_type": "int32", "scale": 1, "data_sort": "低到高", "decimal": 0 }])
+            table_point.addData([{ "id": data_id, "is_valid": false, "is_log": false, "name": "", "point": 3000, "data_type": "int32", "scale": 1, "data_sort": "低到高", "decimal": 0 }])
             tabledata = table_point.getData()
         }
 
@@ -316,7 +316,20 @@
         }
 
         function update_table_point() {
+            // 更改表格的變數型態
             tabledata = table_point.getData()
+
+            for (var i=0; i<tabledata.length; i++){
+                tabledata[i].decimal = Number(tabledata[i].decimal)
+                tabledata[i].id = Number(tabledata[i].id)
+                tabledata[i].point = Number(tabledata[i].point)
+                tabledata[i].scale = Number(tabledata[i].scale)
+                tabledata[i].is_log = Boolean(tabledata[i].is_log)
+                tabledata[i].is_valid = Boolean(tabledata[i].is_valid)
+                tabledata[i].name = tabledata[i].name.replace("\r", "");
+                tabledata[i].now_value = ""
+            }
+            table_point.replaceData(tabledata) // 資料置換更新
             socket.emit("update_point_data", tabledata);
         }
 
@@ -331,8 +344,6 @@
             URL.revokeObjectURL(a.href);
         }
 
-
-
         const fileInput = document.getElementById('fileInput'); // 匯入功能
         fileInput.addEventListener('change', function (e) {
             const file = e.target.files[0];
@@ -344,15 +355,13 @@
                     try {
                         const jsonData = JSON.parse(fileContent);
                         for (const [index, value] of jsonData.entries()) {
-                            if (value["id"] > data_id){
-                                data_id = value["id"]
+                            if (Number(value["id"]) > data_id){
+                                data_id = Number(value["id"])
                             }
-
                         }
 
-                        table_point.replaceData(jsonData)
-                        tabledata = table_point.getData()
-                        socket.emit("update_point_data", tabledata);
+                        table_point.replaceData(jsonData) // 資料置換更新
+                        update_table_point()
                     } catch (error) {
                         alert(`無法解析 JSON 資料:${error}`)
                     }
@@ -360,12 +369,6 @@
                 reader.readAsText(file);
             }
         });
-
-
-
-
-
-
     </script>
 </body>
 

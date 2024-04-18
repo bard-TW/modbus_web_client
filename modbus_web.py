@@ -245,7 +245,7 @@ class ModbusThread(Thread):
                     try:
                         decoder = BinaryPayloadDecoder.fromRegisters(parser_list, byteorder=Endian.BIG, wordorder=Endian.LITTLE)
                         if parser_list == []:
-                            active_power = '異常'
+                            active_power = '未取得資料'
                         elif data_type == 'int16':
                             active_power = decoder.decode_16bit_int()
                         elif data_type == 'int32':
@@ -265,7 +265,7 @@ class ModbusThread(Thread):
                         elif data_type == 'float64':
                             active_power = decoder.decode_64bit_float()
 
-                        if active_power:
+                        if type(active_power) != str:
                             # 計算比例 小數點
                             active_power = active_power / scale
                             active_power = f"{active_power:.{decimal}f}"
@@ -278,7 +278,6 @@ class ModbusThread(Thread):
 
                     if is_log:
                         history_data[key] = active_power
-                        print(history_data, '!!!!!!!!!')
 
                 with app.app_context():
                     emit('modbus_value', self.point_data, namespace='/', broadcast=True, room=self.room)
