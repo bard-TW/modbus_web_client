@@ -38,11 +38,14 @@
         src="{{ url_for('static', filename='js/cdnjs.cloudflare.com_ajax_libs_Chart.js_4.4.0_chart.umd.min.js') }}"></script>
 
     <!-- tabulator 表格 -->
-    <script type="text/javascript" src="https://unpkg.com/tabulator-tables@6.2.0/dist/js/tabulator.min.js"></script>
+    <!-- <script type="text/javascript" src="https://unpkg.com/tabulator-tables@6.2.0/dist/js/tabulator.min.js"></script> -->
+    <script type="text/javascript" src="{{ url_for('static', filename='js/tabulator.min.js') }}"></script>
 
     <!-- <link href="https://unpkg.com/tabulator-tables@6.2.0/dist/css/tabulator.min.css" rel="stylesheet"> -->
-    <link href="https://unpkg.com/tabulator-tables@6.2.0/dist/css/tabulator_simple.min.css" rel="stylesheet">
-    <script type="text/javascript" src="https://oss.sheetjs.com/sheetjs/xlsx.full.min.js"></script>
+    <!-- <link href="https://unpkg.com/tabulator-tables@6.2.0/dist/css/tabulator_simple.min.css" rel="stylesheet"> -->
+    <link href="{{ url_for('static', filename='js/tabulator_simple.min.css') }}" rel="stylesheet">
+    <!-- <script type="text/javascript" src="https://oss.sheetjs.com/sheetjs/xlsx.full.min.js"></script> -->
+    <script type="text/javascript" src="{{ url_for('static', filename='js/xlsx.full.min.js') }}"></script>
 
 
     <style>
