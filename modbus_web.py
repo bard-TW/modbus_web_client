@@ -51,17 +51,19 @@ def handle_disconnect():
         modbus_connect_room[request.sid].exit_signal.set()
 
 @socketio.on('update_point_data')
-def update_point_data(datas, mode=''):
+def update_point_data(datas):
     if request.sid not in modbus_connect_room:
         return
-
-    if mode == 'all':
-        modbus_connect_room[request.sid].point_data = {}
+    
+    modbus_connect_room[request.sid].point_data = {}
+    print(datas)
     for data in datas:
-        modbus_connect_room[request.sid].point_data[data['id']] = data
+        # 判斷是否有效狀態
+        if data["is_valid"] == True:
+            modbus_connect_room[request.sid].point_data[data["id"]] = data
 
     point_list = []
-    for _, value in modbus_connect_room[request.sid].point_data.items():
+    for value in datas:
         data_type = value.get('data_type', 'int32')
         point = int(value.get('point', 3000))
         point_list.append(point)
@@ -120,6 +122,7 @@ class ModbusThread(Thread):
         self.point_type = '3'
         self.slave = 1
         self.point_data = {}
+        # {1: {'id': "1", 'is_valid': True, 'is_log': False, 'name': '測試', 'point': 3306, 'data_type': 'int32', 'scale': 1, 'data_sort': '低到高', 'decimal': 0}}
         self.grouped_numbers = []
 
         self.number_of_success = 0
@@ -161,7 +164,6 @@ class ModbusThread(Thread):
                 emit('connect_modbus_success', {'data': 'modbus 連線成功'}, namespace='/', broadcast=True, room=self.room)
 
             while not self.exit_signal.is_set():
-
                 # 秒數對其，下一輪等待秒數-現在時間，取餘數(毫秒)，取出來先sleep，回應過慢還是會有問題
                 now_time = time.time()
                 next_time = int(now_time) + self.time_sleep
@@ -238,7 +240,6 @@ class ModbusThread(Thread):
                         parser_list = parser_list[::-1]
                     scale = float(value.get('scale', "1"))
                     decimal = int(value.get('decimal', "0"))
-
                     try:
                         decoder = BinaryPayloadDecoder.fromRegisters(parser_list, byteorder=Endian.BIG, wordorder=Endian.LITTLE)
                         if parser_list == []:
@@ -275,12 +276,12 @@ class ModbusThread(Thread):
 
                     if is_log:
                         history_data[key] = active_power
+                        print(history_data, '!!!!!!!!!')
 
                 with app.app_context():
                     emit('modbus_value', self.point_data, namespace='/', broadcast=True, room=self.room)
                     if history_data:
                         history_data['date_time'] = time.strftime("%Y-%m-%d %H:%M:%S", current_time)
-                        print(history_data)
                         emit('update_history', {'history': history_data, 'number_success': f'{self.number_of_success}/{self.number_of_connect}'}, namespace='/', broadcast=True, room=self.room)
 
         finally:
