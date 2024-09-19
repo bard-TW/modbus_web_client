@@ -1,6 +1,8 @@
 # import subprocess
 import argparse
+import os
 import subprocess
+import sys
 import time
 import traceback
 from threading import Event, Thread
@@ -56,7 +58,7 @@ def handle_disconnect():
 def update_point_data(datas):
     if request.sid not in modbus_connect_room:
         return
-    
+
     modbus_connect_room[request.sid].point_data = {}
     print(datas)
     for data in datas:
@@ -137,7 +139,7 @@ class ModbusThread(Thread):
             error_msg += 'step 1. modbus 連線失敗\n'
             with app.app_context():
                 emit('connect_modbus', {'progress': "50%",  "msg": "ping測試"}, namespace='/', broadcast=True, room=self.room)
-            
+
             time.sleep(1)
             is_ping = ping_ip(self.ip)
             if is_ping == True:
@@ -203,7 +205,7 @@ class ModbusThread(Thread):
                     self.number_of_connect += 1
                     count = numbers[-1] - numbers[0]
                     count = 1 if count == 0 else count
-                    
+
                     result = read_funt(numbers[0]-1, count=count, slave=self.slave) # 修正為從0開始
                     if result.isError() == True:
                         grouped_registers.append([])
@@ -237,8 +239,8 @@ class ModbusThread(Thread):
 
                     parser_list = registers[start_list_point1: start_list_point1+count]
 
-                    data_sort = value.get('data_sort', "1")
-                    if data_sort == "2":
+                    data_sort = value.get('data_sort', "低到高")
+                    if data_sort == "高到低":
                         parser_list = parser_list[::-1]
                     scale = float(value.get('scale', "1"))
                     decimal = int(value.get('decimal', "0"))
@@ -311,10 +313,22 @@ def get_commandline():
     return args.port, args.ip
 
 if __name__ == '__main__':
+    lock_file = "modbus_web.lock"
     # from waitress import serve
     # serve(app, host="0.0.0.0", port=8080)
-    port, ip = get_commandline()
 
-    url = f"http://{ip}:{port}"
-    subprocess.Popen(["start", url], shell=True)
-    socketio.run(app, debug=False, host=ip, port=port)
+    if os.path.exists(lock_file):
+        print("程式執行中")
+        sys.exit()
+
+    # 創建鎖定文件
+    with open(lock_file, 'w') as f:
+        f.write("lock")
+
+    try:
+        port, ip = get_commandline()
+        url = f"http://{ip}:{port}"
+        subprocess.Popen(["start", url], shell=True)
+        socketio.run(app, debug=False, host=ip, port=port)
+    finally:
+        os.remove(lock_file)  # 刪除鎖定文件
