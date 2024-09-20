@@ -12,7 +12,8 @@ from engineio.async_drivers import \
 from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 from ping3 import ping
-from pymodbus.client import ModbusTcpClient
+from pymodbus import Framer
+from pymodbus.client import AsyncModbusTcpClient, ModbusTcpClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
@@ -159,7 +160,8 @@ class ModbusThread(Thread):
         return True
 
     def run(self):
-        client = ModbusTcpClient(self.ip, port=int(self.port), timeout=10) # timeout 10 好像是Udp的設定??
+        client = ModbusTcpClient(self.ip, port=int(self.port), timeout=10, framer=Framer.RTU) # timeout 10 好像是Udp的設定??
+
         try:
             if self.test_connection(client) == False:
                 return
