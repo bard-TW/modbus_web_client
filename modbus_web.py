@@ -67,15 +67,18 @@ def update_point_data(datas):
         if data["is_valid"] == True:
             modbus_connect_room[request.sid].point_data[data["id"]] = data
 
+    print(modbus_connect_room, '---------')
+    # TODO 有效未打勾時 不要讀取點位資料
     point_list = []
     for value in datas:
-        data_type = value.get('data_type', 'int32')
+        bit_num = value.get('bit_num', 32)
         point = int(value.get('point', 3000))
         point_list.append(point)
-        if data_type[-2:] == '32':
+        if bit_num == 32:
             point_list.append(point+2)
-        elif data_type[-2:] == '64':
+        elif bit_num == 64:
             point_list.append(point+4)
+    print(point_list, '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     grouped_numbers = group_nearby_numbers(point_list)
     modbus_connect_room[request.sid].grouped_numbers = grouped_numbers
 
@@ -223,7 +226,8 @@ class ModbusThread(Thread):
                     is_log = value.get('is_log', False)
                     # title = value.get('title', '')
                     point = int(value.get('point', 3000))
-                    data_type = value.get('data_type', 'int32')
+                    data_type = value.get('data_type', 'int')
+                    bit_num = value.get('bit_num', 32)
 
                     for i, array in enumerate(self.grouped_numbers):
                         if point not in array:
@@ -232,12 +236,10 @@ class ModbusThread(Thread):
                         start_list_point1 = point - array[0]
                         break
 
-                    if data_type[-2:] == '16':
-                        count = 1
-                    elif data_type[-2:] == '32':
-                        count = 2
-                    elif data_type[-2:] == '64':
-                        count = 4
+                    try:
+                        count = int(bit_num / 16)
+                    except:
+                        count = 0
 
                     parser_list = registers[start_list_point1: start_list_point1+count]
 
@@ -250,24 +252,35 @@ class ModbusThread(Thread):
                         decoder = BinaryPayloadDecoder.fromRegisters(parser_list, byteorder=Endian.BIG, wordorder=Endian.LITTLE)
                         if parser_list == []:
                             active_power = '未取得資料'
-                        elif data_type == 'int16':
-                            active_power = decoder.decode_16bit_int()
-                        elif data_type == 'int32':
-                            active_power = decoder.decode_32bit_int()
-                        elif data_type == 'int64':
-                            active_power = decoder.decode_64bit_int()
-                        elif data_type == 'uint16':
-                            active_power = decoder.decode_16bit_uint()
-                        elif data_type == 'uint32':
-                            active_power = decoder.decode_32bit_uint()
-                        elif data_type == 'uint64':
-                            active_power = decoder.decode_64bit_uint()
-                        elif data_type == 'float16':
-                            active_power = decoder.decode_16bit_float()
-                        elif data_type == 'float32':
-                            active_power = decoder.decode_32bit_float()
-                        elif data_type == 'float64':
-                            active_power = decoder.decode_64bit_float()
+                        elif data_type == 'int':
+                            if bit_num == 16:
+                                active_power = decoder.decode_16bit_int()
+                            elif bit_num == 32:
+                                active_power = decoder.decode_32bit_int()
+                            elif bit_num == 64:
+                                active_power = decoder.decode_64bit_int()
+                            else:
+                                active_power = '為支援此位元數'
+                        elif data_type == 'uint':
+                            if bit_num == 16:
+                                active_power = decoder.decode_16bit_uint()
+                            elif bit_num == 32:
+                                active_power = decoder.decode_32bit_uint()
+                            elif bit_num == 64:
+                                active_power = decoder.decode_64bit_uint()
+                            else:
+                                active_power = '為支援此位元數'
+                        elif data_type == 'float':
+                            if bit_num == 16:
+                                active_power = decoder.decode_16bit_float()
+                            elif bit_num == 32:
+                                active_power = decoder.decode_32bit_float()
+                            elif bit_num == 64:
+                                active_power = decoder.decode_64bit_float()
+                            else:
+                                active_power = '為支援此位元數'
+                        elif data_type == 'ascii':
+                            active_power = ''.join(chr(i) for i in parser_list)
 
                         if type(active_power) != str:
                             # 計算比例 小數點

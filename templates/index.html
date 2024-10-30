@@ -11,9 +11,9 @@
     <script src="{{ url_for('static', filename='js/code.jquery.com_jquery-3.7.1.min.js') }}"></script>
 
     <!-- bootstrap -->
-    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet" 
+    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous"> -->
-    <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js" 
+    <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm" crossorigin="anonymous"></script> -->
     <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"> -->
     <link href="{{ url_for('static', filename='css/cdn.jsdelivr.net_npm_bootstrap@5.3.1_dist_css_bootstrap.min.css') }}"
@@ -32,7 +32,7 @@
     <script src="{{ url_for('static', filename='js/cdn.datatables.net_1.13.6_js_jquery.dataTables.min.js') }}"></script>
 
     <!-- 圖表 -->
-    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" 
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"
     integrity="sha512-SIMGYRUjwY8+gKg7nn9EItdD8LCADSDfJNutF9TPrvEo86sQmFMh6MyralfIyhADlajSxqc7G0gs7+MwWF/ogQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> -->
     <script
         src="{{ url_for('static', filename='js/cdnjs.cloudflare.com_ajax_libs_Chart.js_4.4.0_chart.umd.min.js') }}"></script>
@@ -201,19 +201,18 @@
     <script>
         var data_id = 1
         var tabledata = [
-            { "id": data_id, "is_valid": true, "is_log": false, "name": "測試", "point": 3001, "data_type": "float32", "scale": 1, "data_sort": "低到高", "decimal": 2 }
+            { "id": data_id, "is_valid": true, "is_log": false, "name": "測試", "point": 3001, "data_type": "float", "bit_num": 32, "scale": 1, "data_sort": "低到高", "decimal": 2 }
         ];
-        
+
         var data_type = [
-            "int16",
-            "int32",
-            "int64",
-            "uint16",
-            "uint32",
-            "uint64",
-            "float16",
-            "float32",
-            "float64",
+            "int",
+            "uint",
+            "float",
+            "ascii",
+        ]
+
+        var bit_num = [
+            16, 32, 64
         ]
 
         var table_point_columns = [
@@ -228,6 +227,14 @@
                     allowEmpty: false,
                     listOnEmpty: true,
                     values: data_type,
+                },
+            },
+            {
+                title: "位元數", field: "bit_num", editor: "list", headerSort: false, width: 60, editorParams: {
+                    autocomplete: true,
+                    allowEmpty: false,
+                    listOnEmpty: true,
+                    values: bit_num,
                 },
             },
             { title: "比例", field: "scale", editor: "number", headerSort: false, tooltip: "結果除與這個數字(通常除以1, 10, 100, 1000...)" },
@@ -290,7 +297,7 @@
 
         function add_point() {
             data_id += 1
-            table_point.addData([{ "id": data_id, "is_valid": false, "is_log": false, "name": "", "point": 3000, "data_type": "int32", "scale": 1, "data_sort": "低到高", "decimal": 0 }])
+            table_point.addData([{ "id": data_id, "is_valid": false, "is_log": false, "name": "", "point": 3000, "data_type": "float", "bit_num": 32, "scale": 1, "data_sort": "低到高", "decimal": 0 }])
             tabledata = table_point.getData()
         }
 
