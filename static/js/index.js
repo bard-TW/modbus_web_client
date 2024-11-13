@@ -15,6 +15,9 @@ socket.on('connect_modbus', function (data) {
         $("#connect_modbus_btu").prop("disabled", false);
         $("#ip").prop("disabled", false);
         $("#port").prop("disabled", false);
+        $("#agreement_type").prop("disabled", false);
+        $("#framer_type").prop("disabled", false);
+
         $("#disconnect_modbus_btu").hide()
         $("#connect_modbus_btu").show()
         $("#disconnect_modbus_btu").prop("disabled", false);
@@ -69,7 +72,7 @@ socket.on('update_history', function (data) {
         reset_history_checkbox()
         history_columns_list = Object.keys(historys)
     }
-    
+
 
     history_table.row.add(historys).draw()
     rowCount = history_table.rows().count();

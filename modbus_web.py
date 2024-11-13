@@ -13,7 +13,7 @@ from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 from ping3 import ping
 from pymodbus import Framer
-from pymodbus.client import ModbusTcpClient, ModbusUdpClient
+from pymodbus.client import ModbusSerialClient, ModbusTcpClient, ModbusTlsClient, ModbusUdpClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
@@ -35,11 +35,11 @@ def handle_connect():
     )
 
 @socketio.on('connect_modbus')
-def connect_modbus(ip, port):
+def connect_modbus(ip, port, agreement_type, framer_type):
     if ip == '' or port == '':
         emit('connect_modbus_error', {'data': '輸入錯誤'}, room=request.sid)
         return
-    modbusThread = ModbusThread(ip, port, request.sid)
+    modbusThread = ModbusThread(ip, port, request.sid, agreement_type, framer_type)
     modbusThread.start()
     modbus_connect_room[request.sid] = modbusThread
     # emit('status_response', {'data': data}, room=request.sid)
@@ -119,7 +119,7 @@ def update_basic_data(data):
 
 
 class ModbusThread(Thread):
-    def __init__(self, ip, port, room):
+    def __init__(self, ip, port, room, agreement_type, framer_type):
         super(ModbusThread, self).__init__()
         self.ip = ip
         self.port = port
@@ -128,6 +128,8 @@ class ModbusThread(Thread):
         self.time_sleep = 1
         self.point_type = '3'
         self.slave = 1
+        self.agreement_type = agreement_type
+        self.framer_type = framer_type
         self.point_data = {}
         # {1: {'id': "1", 'is_valid': True, 'is_log': False, 'name': '測試', 'point': 3306, 'data_type': 'int32', 'scale': 1, 'data_sort': '低到高', 'decimal': 0}}
         self.grouped_numbers = []
@@ -162,7 +164,31 @@ class ModbusThread(Thread):
         return True
 
     def run(self):
-        client = ModbusTcpClient(self.ip, port=int(self.port), timeout=3, framer=Framer.RTU)
+        try:
+            framer = Framer.RTU
+            if self.framer_type == 'ASCII':
+                framer = Framer.ASCII
+            elif self.framer_type == 'BINARY':
+                framer = Framer.BINARY
+            elif self.framer_type == 'SOCKET':
+                framer = Framer.SOCKET
+            elif self.framer_type == 'TLS':
+                framer = Framer.TLS
+
+            if self.agreement_type == 'Serial':
+                client = ModbusSerialClient(self.ip, port=int(self.port), timeout=3, framer=framer)
+            elif self.agreement_type == 'Tcp':
+                client = ModbusTcpClient(self.ip, port=int(self.port), timeout=3, framer=framer)
+            elif self.agreement_type == 'Tls':
+                client = ModbusTlsClient(self.ip, port=int(self.port), timeout=3, framer=framer)
+            elif self.agreement_type == 'Udp':
+                client = ModbusUdpClient(self.ip, port=int(self.port), timeout=3, framer=framer)
+        except:
+            client.close()
+            del modbus_connect_room[self.room]
+            print("剩餘modbus連線數:", len(modbus_connect_room))
+            with app.app_context():
+                emit('connect_modbus', {'progress': "0%",  "msg": "已中斷連線"}, namespace='/', broadcast=True, room=self.room)
 
         try:
             if self.test_connection(client) == False:

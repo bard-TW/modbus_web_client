@@ -87,6 +87,28 @@
                         <input type="number" class="form-control" id="port" placeholder="502" value="502" required>
                         <label for="floatingInputGrid">Port</label>
                     </div>
+                    <div class="form-floating">
+                        <select class="form-select" id="agreement_type" aria-label="">
+                            <!-- <option value="Serial">Serial</option> -->
+                            <option value="Tcp" selected>Tcp</option>
+                            <option value="Tls">Tls</option>
+                            <option value="Udp">Udp</option>
+                        </select>
+                        <label for="agreement_type">協議(Beta)</label>
+                        <!-- Modbus Point Type -->
+                    </div>
+                    <div class="form-floating">
+                        <select class="form-select" id="framer_type" aria-label="">
+                            <option value="ASCII">ASCII</option>
+                            <option value="BINARY">BINARY</option>
+                            <option value="RTU" selected>RTU</option>
+                            <option value="SOCKET">SOCKET</option>
+                            <option value="TLS">TLS</option>
+                        </select>
+                        <label for="framer_type">資料幀(Beta)</label>
+                        <!-- Modbus Point Type -->
+                    </div>
+
                     <button type="button" class="btn btn-outline-danger" id="disconnect_modbus_btu"
                         onclick="disconnect_modbus()" style="display: none;">中斷</button>
                     <button type="button" class="btn btn-outline-primary" id="connect_modbus_btu"

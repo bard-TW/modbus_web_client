@@ -53,12 +53,18 @@ function connect_modbus() {
     // 連線
     ip = $("#ip").val()
     port = $("#port").val()
+
+    agreement_type = $("#agreement_type").val()
+    framer_type = $("#framer_type").val()
+
     if (socket.connected === true) {
-        socket.emit("connect_modbus", ip, port);
+        socket.emit("connect_modbus", ip, port, agreement_type, framer_type);
 
         $("#connect_modbus_btu").prop("disabled", true);
         $("#ip").prop("disabled", true);
         $("#port").prop("disabled", true);
+        $("#agreement_type").prop("disabled", true);
+        $("#framer_type").prop("disabled", true);
 
         $("#progressbar").css("width", "25%");
         $("#progressbar").text("嘗試連線");
@@ -80,6 +86,8 @@ function disconnect_modbus() {
 
         $("#ip").prop("disabled", false);
         $("#port").prop("disabled", false);
+        $("#agreement_type").prop("disabled", false);
+        $("#framer_type").prop("disabled", false);
 
         $("#disconnect_modbus_btu").hide()
         $("#connect_modbus_btu").show()
