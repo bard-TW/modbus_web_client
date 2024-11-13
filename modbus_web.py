@@ -13,7 +13,7 @@ from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 from ping3 import ping
 from pymodbus import Framer
-from pymodbus.client import AsyncModbusTcpClient, ModbusTcpClient
+from pymodbus.client import ModbusTcpClient, ModbusUdpClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
@@ -67,10 +67,10 @@ def update_point_data(datas):
         if data["is_valid"] == True:
             modbus_connect_room[request.sid].point_data[data["id"]] = data
 
-    print(modbus_connect_room, '---------')
-    # TODO 有效未打勾時 不要讀取點位資料
     point_list = []
     for value in datas:
+        if value["is_valid"] == False:
+            continue
         bit_num = value.get('bit_num', 32)
         point = int(value.get('point', 3000))
         point_list.append(point)
@@ -78,7 +78,6 @@ def update_point_data(datas):
             point_list.append(point+2)
         elif bit_num == 64:
             point_list.append(point+4)
-    print(point_list, '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     grouped_numbers = group_nearby_numbers(point_list)
     modbus_connect_room[request.sid].grouped_numbers = grouped_numbers
 
@@ -136,7 +135,7 @@ class ModbusThread(Thread):
         self.number_of_success = 0
         self.number_of_connect = 0
 
-    def test_connection(self, client:ModbusTcpClient):
+    def test_connection(self, client):
         connection = client.connect()
         error_msg = ''
         if not connection:
@@ -163,7 +162,7 @@ class ModbusThread(Thread):
         return True
 
     def run(self):
-        client = ModbusTcpClient(self.ip, port=int(self.port), timeout=10, framer=Framer.RTU) # timeout 10 好像是Udp的設定??
+        client = ModbusTcpClient(self.ip, port=int(self.port), timeout=3, framer=Framer.RTU)
 
         try:
             if self.test_connection(client) == False:
@@ -173,7 +172,7 @@ class ModbusThread(Thread):
                 emit('connect_modbus_success', {'data': 'modbus 連線成功'}, namespace='/', broadcast=True, room=self.room)
 
             while not self.exit_signal.is_set():
-                # 秒數對其，下一輪等待秒數-現在時間，取餘數(毫秒)，取出來先sleep，回應過慢還是會有問題
+                # 秒數對齊，下一輪等待秒數-現在時間，取餘數(毫秒)，取出來先sleep，回應過慢還是會有問題
                 now_time = time.time()
                 next_time = int(now_time) + self.time_sleep
                 sleep_second = next_time - (self.time_sleep-1) - now_time
@@ -212,6 +211,7 @@ class ModbusThread(Thread):
                     count = 1 if count == 0 else count
 
                     result = read_funt(numbers[0]-1, count=count, slave=self.slave) # 修正為從0開始
+
                     if result.isError() == True:
                         grouped_registers.append([])
                         continue
