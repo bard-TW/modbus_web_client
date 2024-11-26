@@ -75,10 +75,16 @@ def update_point_data(datas):
     for value in datas:
         if value["is_valid"] == False:
             continue
-        bit_num = value.get('bit_num', 32)
+        bit_num = int(value.get('bit_num', 32))
         point = int(value.get('point', 3000))
+        data_type = value.get('data_type', '')
+
         point_list.append(point)
-        if bit_num == 32:
+        if data_type == 'boolean':
+            point_list.append(point+1)
+        elif bit_num == 16:
+            point_list.append(point+1)
+        elif bit_num == 32:
             point_list.append(point+2)
         elif bit_num == 64:
             point_list.append(point+4)
@@ -253,11 +259,12 @@ class ModbusThread(Thread):
 
                 history_data = {}
                 for key, value in self.point_data.items():
+
                     is_log = value.get('is_log', False)
                     # title = value.get('title', '')
                     point = int(value.get('point', 3000))
                     data_type = value.get('data_type', 'int')
-                    bit_num = value.get('bit_num', 32)
+                    bit_num = int(value.get('bit_num', 32))
                     mask = value.get('mask', 0)
 
                     for i, array in enumerate(self.grouped_numbers):
@@ -267,10 +274,9 @@ class ModbusThread(Thread):
                         start_list_point1 = point - array[0]
                         break
 
-                    try:
-                        count = int(bit_num / 16)
-                    except:
-                        count = 0
+                    count = int(bit_num / 16)
+                    if data_type == 'boolean':
+                        count = 1
 
                     parser_list = registers[start_list_point1: start_list_point1+count]
 
