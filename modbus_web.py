@@ -24,6 +24,10 @@ socketio = SocketIO(app, async_mode="threading")
 
 modbus_connect_room = {} # sid: obj
 
+@app.route('/clean-pme')
+def clean_pme():
+    return render_template('clean_pme.html')
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -254,6 +258,7 @@ class ModbusThread(Thread):
                     point = int(value.get('point', 3000))
                     data_type = value.get('data_type', 'int')
                     bit_num = value.get('bit_num', 32)
+                    mask = value.get('mask', 0)
 
                     for i, array in enumerate(self.grouped_numbers):
                         if point not in array:
@@ -308,6 +313,10 @@ class ModbusThread(Thread):
                         elif data_type == 'ascii':
                             active_power = ''.join(chr(i) for i in parser_list)
 
+                        elif data_type == 'boolean':
+                            num = decoder.decode_16bit_int()
+                            active_power = (num & int(mask, 16)) >> 1 # 取得重疊位置，並移到第一位，確保值是0 or 1
+
                         if type(active_power) != str:
                             # 計算比例 小數點
                             active_power = active_power / scale
@@ -326,8 +335,8 @@ class ModbusThread(Thread):
                     emit('modbus_value', self.point_data, namespace='/', broadcast=True, room=self.room)
                     if history_data:
                         history_data['date_time'] = time.strftime("%Y-%m-%d %H:%M:%S", current_time)
-                        emit('update_history', {'history': history_data, 'number_success': f'{self.number_of_success}/{self.number_of_connect}'}, namespace='/', broadcast=True, room=self.room)
-
+                        # emit('update_history', {'history': history_data, 'number_success': f'{self.number_of_success}/{self.number_of_connect}'}, namespace='/', broadcast=True, room=self.room)
+                        emit('update_history', {'history': history_data, 'number_success': f'傳送次數:{self.number_of_success}/回應次數:{self.number_of_connect}, 丟包率:{round(1-self.number_of_success/self.number_of_connect, 2)}%'}, namespace='/', broadcast=True, room=self.room)
         finally:
             # print('斷開連線', self.room)
             client.close()

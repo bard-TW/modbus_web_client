@@ -42,7 +42,7 @@ var history_table = $('#history_table').DataTable({
     "lengthMenu": [
         [20, 50, 100, 200],
         [20, 50, 100, 200]
-    ]
+    ],
 });
 
 var history_columns_list = []
@@ -145,7 +145,7 @@ function reset_history_checkbox() {
             "lengthMenu": [
                 [20, 50, 100, 200],
                 [20, 50, 100, 200]
-            ]
+            ],
         });
     } else {
         // console.log(history_columnDefs)
@@ -162,6 +162,37 @@ function reset_history_checkbox() {
             "order": [[0, "desc"]],
         });
     }
+}
+
+function downloadCSV() {
+    var table = $('#history_table').DataTable();  // 取得 DataTable 實例
+    var data = table.rows({ search: 'applied' }).data();  // 取得當前頁面上的資料
+
+    var csv = [];
+    var headers = [];
+
+    // 取得表格的表頭
+    $('#history_table thead tr th').each(function () {
+        headers.push($(this).text());
+    });
+    csv.push(headers.join(','));  // 加入表頭
+
+    // 轉換每行資料為 CSV 格式
+    data.each(function (row) {
+        var rowArray = [];
+        // 這裡要確保每個 row 的資料是陣列形式
+        $.each(row, function (index, cell) {
+            rowArray.push(cell);  // 取得每個單元格的資料並加入陣列
+        });
+        csv.push(rowArray.join(','));  // 將每行資料組合成 CSV 格式
+    });
+
+    // 下載 CSV
+    var csvFile = new Blob([csv.join('\n')], { type: 'text/csv' });
+    var downloadLink = document.createElement('a');
+    downloadLink.href = URL.createObjectURL(csvFile);
+    downloadLink.download = 'history_data.csv';  // 設定下載的檔案名稱
+    downloadLink.click();
 }
 
 $("#show_switch").on("change", "input, select", function () { // logs表 隱藏顯示欄位
