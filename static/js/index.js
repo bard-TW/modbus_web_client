@@ -17,6 +17,7 @@ socket.on('connect_modbus', function (data) {
         $("#port").prop("disabled", false);
         $("#agreement_type").prop("disabled", false);
         $("#framer_type").prop("disabled", false);
+        $("#is_powerful_connection").prop("disabled", false);
 
         $("#disconnect_modbus_btu").hide()
         $("#connect_modbus_btu").show()
@@ -82,8 +83,6 @@ socket.on('update_history', function (data) {
 
     update_chart(historys)
     $("#number_success").html(data.number_success)
-
-
 });
 
 

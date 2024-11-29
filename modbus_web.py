@@ -39,11 +39,11 @@ def handle_connect():
     )
 
 @socketio.on('connect_modbus')
-def connect_modbus(ip, port, agreement_type, framer_type):
+def connect_modbus(ip, port, agreement_type, framer_type, is_powerful_connection):
     if ip == '' or port == '':
         emit('connect_modbus_error', {'data': '輸入錯誤'}, room=request.sid)
         return
-    modbusThread = ModbusThread(ip, port, request.sid, agreement_type, framer_type)
+    modbusThread = ModbusThread(ip, port, request.sid, agreement_type, framer_type, is_powerful_connection)
     modbusThread.start()
     modbus_connect_room[request.sid] = modbusThread
     # emit('status_response', {'data': data}, room=request.sid)
@@ -129,7 +129,7 @@ def update_basic_data(data):
 
 
 class ModbusThread(Thread):
-    def __init__(self, ip, port, room, agreement_type, framer_type):
+    def __init__(self, ip, port, room, agreement_type, framer_type, is_powerful_connection):
         super(ModbusThread, self).__init__()
         self.ip = ip
         self.port = port
@@ -140,6 +140,7 @@ class ModbusThread(Thread):
         self.slave = 1
         self.agreement_type = agreement_type
         self.framer_type = framer_type
+        self.powerful_connection = int(is_powerful_connection) # 強力連接狀態 1:有設定 2:有連線成功
         self.point_data = {}
         # {1: {'id': "1", 'is_valid': True, 'is_log': False, 'name': '測試', 'point': 3306, 'data_type': 'int32', 'scale': 1, 'data_sort': '低到高', 'decimal': 0}}
         self.grouped_numbers = []
@@ -169,7 +170,8 @@ class ModbusThread(Thread):
         if not connection:
             with app.app_context():
                 error_msg += 'step 3. modbus 第2次連線失敗'
-                emit('connect_modbus_error', {'data': error_msg}, namespace='/', broadcast=True, room=self.room)
+                if self.powerful_connection != 2:
+                    emit('connect_modbus_error', {'data': error_msg}, namespace='/', broadcast=True, room=self.room)
             return False
         return True
 
@@ -200,156 +202,174 @@ class ModbusThread(Thread):
             with app.app_context():
                 emit('connect_modbus', {'progress': "0%",  "msg": "已中斷連線"}, namespace='/', broadcast=True, room=self.room)
 
-        try:
-            if self.test_connection(client) == False:
-                return
-
-            with app.app_context():
-                emit('connect_modbus_success', {'data': 'modbus 連線成功'}, namespace='/', broadcast=True, room=self.room)
-
-            while not self.exit_signal.is_set():
-                # 秒數對齊，下一輪等待秒數-現在時間，取餘數(毫秒)，取出來先sleep，回應過慢還是會有問題
-                now_time = time.time()
-                next_time = int(now_time) + self.time_sleep
-                sleep_second = next_time - (self.time_sleep-1) - now_time
-                time.sleep(sleep_second if sleep_second > 0 else 0)
-
-                with app.app_context():
-                    emit('wait_time_progress', {'progress': f"{0}%"}, namespace='/', broadcast=True, room=self.room)
-
-                for x in range(self.time_sleep-1, 0, -1):
-                    time.sleep(1)
-                    if self.time_sleep >=5:
-                        with app.app_context():
-                            emit('wait_time_progress', {'progress': f"{int((self.time_sleep-x)/(self.time_sleep-1)*100)}%"}, namespace='/', broadcast=True, room=self.room)
-
-                    if x > self.time_sleep or self.exit_signal.is_set():
-                        break
-
-                current_time = time.localtime()
-
-                if self.point_type == '1':
-                    read_funt = client.read_coils
-                elif self.point_type == '2':
-                    read_funt = client.read_discrete_inputs
-                elif self.point_type == '4':
-                    read_funt = client.read_input_registers
-                else:
-                    read_funt = client.read_holding_registers
-
-                if len(self.point_data) == 0:
+        while True:
+            try:
+                is_connection = self.test_connection(client)
+                if is_connection == False and self.powerful_connection <= 1:
+                    return
+                elif is_connection  == False and self.powerful_connection == 2:
+                    if self.exit_signal.is_set():
+                        self.powerful_connection = 1
+                        return
                     continue
 
-                grouped_registers = []
-                for numbers in self.grouped_numbers:
-                    self.number_of_connect += 1
-                    count = numbers[-1] - numbers[0]
-                    count = 1 if count == 0 else count
-
-                    result = read_funt(numbers[0]-1, count=count, slave=self.slave) # 修正為從0開始
-
-                    if result.isError() == True:
-                        grouped_registers.append([])
-                        continue
-                    grouped_registers.append(result.registers)
-                    self.number_of_success += 1
-
-                print('點位分區:', self.grouped_numbers)
-                print('分區資料:', grouped_registers)
-
-                history_data = {}
-                for key, value in self.point_data.items():
-
-                    is_log = value.get('is_log', False)
-                    # title = value.get('title', '')
-                    point = int(value.get('point', 3000))
-                    data_type = value.get('data_type', 'int')
-                    bit_num = int(value.get('bit_num', 32))
-                    mask = value.get('mask', 0)
-
-                    for i, array in enumerate(self.grouped_numbers):
-                        if point not in array:
-                            continue
-                        registers = grouped_registers[i]
-                        start_list_point1 = point - array[0]
-                        break
-
-                    count = int(bit_num / 16)
-                    if data_type == 'boolean':
-                        count = 1
-
-                    parser_list = registers[start_list_point1: start_list_point1+count]
-
-                    data_sort = value.get('data_sort', "低到高")
-                    if data_sort == "高到低":
-                        parser_list = parser_list[::-1]
-                    scale = float(value.get('scale', "1"))
-                    decimal = int(value.get('decimal', "0"))
-                    try:
-                        decoder = BinaryPayloadDecoder.fromRegisters(parser_list, byteorder=Endian.BIG, wordorder=Endian.LITTLE)
-                        if parser_list == []:
-                            active_power = '未取得資料'
-                        elif data_type == 'int':
-                            if bit_num == 16:
-                                active_power = decoder.decode_16bit_int()
-                            elif bit_num == 32:
-                                active_power = decoder.decode_32bit_int()
-                            elif bit_num == 64:
-                                active_power = decoder.decode_64bit_int()
-                            else:
-                                active_power = '為支援此位元數'
-                        elif data_type == 'uint':
-                            if bit_num == 16:
-                                active_power = decoder.decode_16bit_uint()
-                            elif bit_num == 32:
-                                active_power = decoder.decode_32bit_uint()
-                            elif bit_num == 64:
-                                active_power = decoder.decode_64bit_uint()
-                            else:
-                                active_power = '為支援此位元數'
-                        elif data_type == 'float':
-                            if bit_num == 16:
-                                active_power = decoder.decode_16bit_float()
-                            elif bit_num == 32:
-                                active_power = decoder.decode_32bit_float()
-                            elif bit_num == 64:
-                                active_power = decoder.decode_64bit_float()
-                            else:
-                                active_power = '為支援此位元數'
-                        elif data_type == 'ascii':
-                            active_power = ''.join(chr(i) for i in parser_list)
-
-                        elif data_type == 'boolean':
-                            num = decoder.decode_16bit_int()
-                            active_power = (num & int(mask, 16)) >> 1 # 取得重疊位置，並移到第一位，確保值是0 or 1
-
-                        if type(active_power) != str:
-                            # 計算比例 小數點
-                            active_power = active_power / scale
-                            active_power = f"{active_power:.{decimal}f}"
-
-                    except Exception as e:
-                        traceback.print_exc()
-                        print(e)
-                        active_power = "異常"
-                    self.point_data[key]['now_value'] = active_power
-
-                    if is_log:
-                        history_data[key] = active_power
+                if self.powerful_connection == 1:
+                    self.powerful_connection = 2
 
                 with app.app_context():
-                    emit('modbus_value', self.point_data, namespace='/', broadcast=True, room=self.room)
-                    if history_data:
-                        history_data['date_time'] = time.strftime("%Y-%m-%d %H:%M:%S", current_time)
-                        # emit('update_history', {'history': history_data, 'number_success': f'{self.number_of_success}/{self.number_of_connect}'}, namespace='/', broadcast=True, room=self.room)
-                        emit('update_history', {'history': history_data, 'number_success': f'傳送次數:{self.number_of_success}/回應次數:{self.number_of_connect}, 丟包率:{round(1-self.number_of_success/self.number_of_connect, 2)}%'}, namespace='/', broadcast=True, room=self.room)
-        finally:
-            # print('斷開連線', self.room)
-            client.close()
-            del modbus_connect_room[self.room]
-            print("剩餘modbus連線數:", len(modbus_connect_room))
-            with app.app_context():
-                emit('connect_modbus', {'progress': "0%",  "msg": "已中斷連線"}, namespace='/', broadcast=True, room=self.room)
+                    emit('connect_modbus_success', {'data': 'modbus 連線成功'}, namespace='/', broadcast=True, room=self.room)
+
+                while not self.exit_signal.is_set():
+                    # 秒數對齊，下一輪等待秒數-現在時間，取餘數(毫秒)，取出來先sleep，回應過慢還是會有問題
+                    now_time = time.time()
+                    next_time = int(now_time) + self.time_sleep
+                    sleep_second = next_time - (self.time_sleep-1) - now_time
+                    time.sleep(sleep_second if sleep_second > 0 else 0)
+
+                    with app.app_context():
+                        emit('wait_time_progress', {'progress': f"{0}%"}, namespace='/', broadcast=True, room=self.room)
+
+                    for x in range(self.time_sleep-1, 0, -1):
+                        time.sleep(1)
+                        if self.time_sleep >=5:
+                            with app.app_context():
+                                emit('wait_time_progress', {'progress': f"{int((self.time_sleep-x)/(self.time_sleep-1)*100)}%"}, namespace='/', broadcast=True, room=self.room)
+
+                        if x > self.time_sleep or self.exit_signal.is_set():
+                            break
+
+                    current_time = time.localtime()
+
+                    if self.point_type == '1':
+                        read_funt = client.read_coils
+                    elif self.point_type == '2':
+                        read_funt = client.read_discrete_inputs
+                    elif self.point_type == '4':
+                        read_funt = client.read_input_registers
+                    else:
+                        read_funt = client.read_holding_registers
+
+                    if len(self.point_data) == 0:
+                        continue
+
+                    grouped_registers = []
+                    for numbers in self.grouped_numbers:
+                        self.number_of_connect += 1
+                        count = numbers[-1] - numbers[0]
+                        count = 1 if count == 0 else count
+
+                        result = read_funt(numbers[0]-1, count=count, slave=self.slave) # 修正為從0開始
+
+                        if result.isError() == True:
+                            grouped_registers.append([])
+                            continue
+                        grouped_registers.append(result.registers)
+                        self.number_of_success += 1
+
+                    print('點位分區:', self.grouped_numbers)
+                    print('分區資料:', grouped_registers)
+
+                    history_data = {}
+                    for key, value in self.point_data.items():
+
+                        is_log = value.get('is_log', False)
+                        # title = value.get('title', '')
+                        point = int(value.get('point', 3000))
+                        data_type = value.get('data_type', 'int')
+                        bit_num = int(value.get('bit_num', 32))
+                        mask = value.get('mask', 0)
+
+                        for i, array in enumerate(self.grouped_numbers):
+                            if point not in array:
+                                continue
+                            registers = grouped_registers[i]
+                            start_list_point1 = point - array[0]
+                            break
+
+                        count = int(bit_num / 16)
+                        if data_type == 'boolean':
+                            count = 1
+
+                        parser_list = registers[start_list_point1: start_list_point1+count]
+
+                        data_sort = value.get('data_sort', "低到高")
+                        if data_sort == "高到低":
+                            parser_list = parser_list[::-1]
+                        scale = float(value.get('scale', "1"))
+                        decimal = int(value.get('decimal', "0"))
+                        try:
+                            decoder = BinaryPayloadDecoder.fromRegisters(parser_list, byteorder=Endian.BIG, wordorder=Endian.LITTLE)
+                            if parser_list == []:
+                                active_power = '未取得資料'
+                            elif data_type == 'int':
+                                if bit_num == 16:
+                                    active_power = decoder.decode_16bit_int()
+                                elif bit_num == 32:
+                                    active_power = decoder.decode_32bit_int()
+                                elif bit_num == 64:
+                                    active_power = decoder.decode_64bit_int()
+                                else:
+                                    active_power = '為支援此位元數'
+                            elif data_type == 'uint':
+                                if bit_num == 16:
+                                    active_power = decoder.decode_16bit_uint()
+                                elif bit_num == 32:
+                                    active_power = decoder.decode_32bit_uint()
+                                elif bit_num == 64:
+                                    active_power = decoder.decode_64bit_uint()
+                                else:
+                                    active_power = '為支援此位元數'
+                            elif data_type == 'float':
+                                if bit_num == 16:
+                                    active_power = decoder.decode_16bit_float()
+                                elif bit_num == 32:
+                                    active_power = decoder.decode_32bit_float()
+                                elif bit_num == 64:
+                                    active_power = decoder.decode_64bit_float()
+                                else:
+                                    active_power = '為支援此位元數'
+                            elif data_type == 'ascii':
+                                active_power = ''.join(chr(i) for i in parser_list)
+
+                            elif data_type == 'boolean':
+                                num = decoder.decode_16bit_int()
+                                active_power = (num & int(mask, 16)) >> 1 # 取得重疊位置，並移到第一位，確保值是0 or 1
+
+                            if type(active_power) != str:
+                                # 計算比例 小數點
+                                active_power = active_power / scale
+                                active_power = f"{active_power:.{decimal}f}"
+
+                        except Exception as e:
+                            traceback.print_exc()
+                            print(e)
+                            active_power = "異常"
+                        self.point_data[key]['now_value'] = active_power
+
+                        if is_log:
+                            history_data[key] = active_power
+
+                    with app.app_context():
+                        emit('modbus_value', self.point_data, namespace='/', broadcast=True, room=self.room)
+                        if history_data:
+                            history_data['date_time'] = time.strftime("%Y-%m-%d %H:%M:%S", current_time)
+                            # emit('update_history', {'history': history_data, 'number_success': f'{self.number_of_success}/{self.number_of_connect}'}, namespace='/', broadcast=True, room=self.room)
+                            emit('update_history', {'history': history_data, 'number_success': f'傳送次數:{self.number_of_success}/回應次數:{self.number_of_connect}, 丟包率:{round(1-self.number_of_success/self.number_of_connect, 2)}%'}, namespace='/', broadcast=True, room=self.room)
+            except:
+                if self.powerful_connection == 2:
+                    client.close()
+                    print('嘗試連線中')
+                    time.sleep(3)
+            finally:
+                # print('斷開連線', self.room)
+                if self.powerful_connection <= 1 or self.exit_signal.is_set():
+                    client.close()
+                    del modbus_connect_room[self.room]
+                    print("剩餘modbus連線數:", len(modbus_connect_room))
+                    with app.app_context():
+                        emit('connect_modbus', {'progress': "0%",  "msg": "已中斷連線"}, namespace='/', broadcast=True, room=self.room)
+                    return
+
 
 def ping_ip(ip_address):
     response_time = ping(ip_address)

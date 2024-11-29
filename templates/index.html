@@ -129,6 +129,15 @@
                         <!-- Modbus Point Type -->
                     </div>
 
+                    <div class="form-floating" title="斷線後持續嘗試連線">
+                        <select class="form-select" id="is_powerful_connection" aria-label="">
+                            <option value=1>是</option>
+                            <option value=0 selected>否</option>
+                        </select>
+                        <label for="is_powerful_connection">強力連接(Beta)</label>
+                        <!-- Modbus Point Type -->
+                    </div>
+
                     <button type="button" class="btn btn-outline-danger" id="disconnect_modbus_btu"
                         onclick="disconnect_modbus()" style="display: none;">中斷</button>
                     <button type="button" class="btn btn-outline-primary" id="connect_modbus_btu"
